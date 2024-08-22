@@ -1,37 +1,31 @@
 -- Create the procedure ComputeAverageWeightedScoreForUser
+
 DELIMITER //
 
+-- Procedure: ComputeAverageWeightedScoreForUser
+-- Description: This procedure computes and stores the average weighted score for a student.
+-- Parameters:
+--   p_user_id INT - The ID of the user (student) for whom to compute the average weighted score
+-- Note: The weighted score is computed based on project weights and correction scores.
+--       If the user has no scores, their average weighted score is set to 0.
+
 CREATE PROCEDURE ComputeAverageWeightedScoreForUser(
-    IN user_id INT
+    IN p_user_id INT
 )
 BEGIN
-    DECLARE weighted_sum DECIMAL(10, 2);
-    DECLARE total_weight DECIMAL(10, 2);
-    DECLARE average_weighted_score DECIMAL(10, 2);
+    DECLARE v_weighted_avg_score DECIMAL(10,2);
 
-    -- Calculate the weighted sum of the scores for the given user_id
-    SELECT 
-        SUM(score * weight) INTO weighted_sum,
-        SUM(weight) INTO total_weight
-    FROM 
-        scores
-    WHERE 
-        user_id = user_id;
+    -- Compute the weighted average score
+    SELECT COALESCE(SUM(corrections.score * projects.weight) / SUM(projects.weight), 0)
+    INTO v_weighted_avg_score
+    FROM corrections
+    INNER JOIN projects ON corrections.project_id = projects.id
+    WHERE corrections.user_id = p_user_id;
 
-    -- Check if total_weight is not zero to avoid division by zero
-    IF total_weight > 0 THEN
-        SET average_weighted_score = weighted_sum / total_weight;
-    ELSE
-        SET average_weighted_score = 0;
-    END IF;
-
-    -- Insert or update the average weighted score for the user in the weighted_scores table
-    INSERT INTO weighted_scores (user_id, average_weighted_score)
-    VALUES (user_id, average_weighted_score)
-    ON DUPLICATE KEY UPDATE
-        average_weighted_score = VALUES(average_weighted_score);
-
-END;
-//
+    -- Update the average_score in the users table
+    UPDATE users
+    SET average_score = v_weighted_avg_score
+    WHERE id = p_user_id;
+END //
 
 DELIMITER ;
